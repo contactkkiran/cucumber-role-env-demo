@@ -1,0 +1,92 @@
+# Two Scenarios execution flow
+
+ ┌────────────────────────────────────────────────────────────────────┐
+ │                      Test Suite (Single Driver)                    │
+ └────────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+     @BeforeAll (SuiteHooks.globalSetup)
+     - Driver.get() → create ONE ChromeDriver
+     - Open DOMAIN_URL from .env
+                │
+                ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │                         Scenario 1: Approver                       │
+ └────────────────────────────────────────────────────────────────────┘
+    Background: Given I load env configuration
+                │
+                ▼
+    When I switch to role Approver
+                │
+                ▼
+    RoleSteps.i_switch_to_role("Approver")
+                │
+                ▼
+    Role.valueOf("APPROVER") ────────────────┐
+                │                             │
+                ▼                             │
+    EnvCredentialProvider.forRole(APPROVER)   │
+    - prefix = "APPROVER"                     │
+    - user = Env.get("APPROVER_USERNAME")     │  (.env → java-dotenv)
+    - pass = Env.get("APPROVER_PASSWORD")     │
+    - return new Credentials(user, pass) ◄────┘
+                │
+                ▼
+    LoginPage.open(baseUrl) → /login
+                │
+                ▼
+    LoginPage.login(c.username(), c.password())
+    - type username/password
+    - click submit
+                │
+                ▼
+    Then the title should contain "Example"
+    - HomePage.titleContains("Example") → assert
+
+                │
+                ▼
+     @Before (SuiteHooks.beforeEach) for next scenario
+     - deleteAllCookies()
+     - navigate to DOMAIN_URL   (Driver reused — same browser)
+
+                │
+                ▼
+ ┌────────────────────────────────────────────────────────────────────┐
+ │                           Scenario 2: Admin                        │
+ └────────────────────────────────────────────────────────────────────┘
+    Background: Given I load env configuration
+                │
+                ▼
+    When I switch to role Admin
+                │
+                ▼
+    RoleSteps.i_switch_to_role("Admin")
+                │
+                ▼
+    Role.valueOf("ADMIN") ────────────────────┐
+                │                             │
+                ▼                             │
+    EnvCredentialProvider.forRole(ADMIN)      │
+    - user = Env.get("ADMIN_USERNAME")        │
+    - pass = Env.get("ADMIN_PASSWORD")        │
+    - return new Credentials(user, pass) ◄────┘
+                │
+                ▼
+    LoginPage.open(baseUrl) → /login
+                │
+                ▼
+    LoginPage.login(c.username(), c.password())
+                │
+                ▼
+    Then the title should contain "Example"
+
+                │
+                ▼
+      @AfterAll (SuiteHooks.globalTeardown)
+      - Driver.quit()   (close the single browser)
+
+Legend
+.env → loaded by Env.java (java-dotenv).
+Credentials record → carries username/password.
+One browser for entire run (created in @BeforeAll, closed in @AfterAll).
+State reset before each scenario via cookies clear + navigate.
